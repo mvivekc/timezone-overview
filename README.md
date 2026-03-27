@@ -157,6 +157,77 @@ npm run preview
 
 ---
 
+## Deploying with vibectl (Vibe Platform)
+
+This repository is configured to deploy through Vibe Control Plane.
+
+### What gets deployed
+
+- Source code from the current Git commit on `main`
+- Build/deploy configuration from `vibecoding.yaml` in the repo root
+- For this project, `vibecoding.yaml` defines a static app build:
+  - `type: static`
+  - `build.command: npm run build`
+  - `output: dist`
+
+### Where code is pushed
+
+- Git remote (`origin`): `https://github.com/sixt-vibe/mammoth-work-2374.git`
+- Active branch: `main` (tracks `origin/main`)
+
+Check this at any time:
+
+```bash
+git remote -v
+git branch -vv
+```
+
+### Standard release flow
+
+```bash
+# 1) Make changes and validate locally
+npm run build
+
+# 2) Commit and push
+git add .
+git commit -m "feat: describe your change"
+git push origin main
+
+# 3) Trigger build from the exact pushed commit
+vibectl build trigger --project timezone-helper --commit $(git rev-parse HEAD)
+
+# 4) Wait for build success
+vibectl build status --project timezone-helper
+
+# 5) Deploy that same commit
+vibectl deploy trigger --project timezone-helper --commit $(git rev-parse HEAD)
+
+# 6) Verify deployment and endpoint health
+vibectl deploy status --project timezone-helper
+```
+
+### Live endpoint
+
+- Current app URL: `https://mammoth-work-2374.prod.vibecoding.sixt.cloud`
+
+### Authentication
+
+If a `vibectl` command fails due to expired auth, run:
+
+```bash
+vibectl login
+```
+
+### Notes on history
+
+During Vibe bootstrap, the repository metadata was switched to the Vibe-managed remote. If you need older pre-bootstrap local history, it is preserved in `.git_backup` and can be viewed with:
+
+```bash
+git --git-dir=.git_backup --work-tree=. log --oneline
+```
+
+---
+
 ## localStorage schema
 
 The app stores everything under the key `tz-helper-v1`. The schema is versioned to allow safe migrations in future releases:
