@@ -1,6 +1,6 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { X, GripVertical, RotateCcw } from 'lucide-react';
-import type { Zone, HourBlock, WorkHours, WorkClass } from '@/types';
+import type { Zone, HourBlock, WorkHours } from '@/types';
 import { DEFAULT_WORK_HOURS } from '@/utils/constants';
 import { formatTimeInZone, getUtcOffsetLabel, classifyHour } from '@/utils/timezones';
 
