@@ -167,16 +167,25 @@ const WORK_DOT: Record<WorkClass, string> = {
 };
 
 function AllZonesTooltip({ zones, needleUtcMs, hour12, anchorX, anchorY }: TooltipProps) {
-  // Keep tooltip inside viewport horizontally
   const vw = window.innerWidth;
-  let left = anchorX - TOOLTIP_WIDTH / 2;
-  if (left < TOOLTIP_MARGIN) left = TOOLTIP_MARGIN;
-  if (left + TOOLTIP_WIDTH > vw - TOOLTIP_MARGIN) left = vw - TOOLTIP_WIDTH - TOOLTIP_MARGIN;
-
-  // Position above the knob (anchorY is the top of the needle zone)
-  const rowHeight = 40; // estimate per zone row
+  const vh = window.innerHeight;
+  const rowHeight = 40;
   const tooltipHeight = zones.length * rowHeight + 32;
-  const top = anchorY - tooltipHeight - 8;
+  const KNOB_OFFSET = 20; // distance from needle center to tooltip edge
+
+  // Prefer right of needle; fall back to left if not enough room
+  let left = anchorX + KNOB_OFFSET;
+  if (left + TOOLTIP_WIDTH > vw - TOOLTIP_MARGIN) {
+    left = anchorX - TOOLTIP_WIDTH - KNOB_OFFSET;
+  }
+  left = Math.max(TOOLTIP_MARGIN, left);
+
+  // Align top of tooltip with the knob; nudge up if it overflows bottom
+  let top = anchorY;
+  if (top + tooltipHeight > vh - TOOLTIP_MARGIN) {
+    top = vh - tooltipHeight - TOOLTIP_MARGIN;
+  }
+  top = Math.max(TOOLTIP_MARGIN, top);
 
   return (
     <div

@@ -44,6 +44,7 @@ export const COMMON_ZONES: { group: string; zones: { tz: string; label: string; 
     group: 'Europe',
     zones: [
       { tz: 'Europe/London',    label: 'London',      flag: '🇬🇧', country: 'United Kingdom' },
+      { tz: 'Europe/Dublin',    label: 'Dublin',      flag: '🇮🇪', country: 'Ireland' },
       { tz: 'Europe/Lisbon',    label: 'Lisbon',      flag: '🇵🇹', country: 'Portugal' },
       { tz: 'Europe/Paris',     label: 'Paris',        flag: '🇫🇷', country: 'France' },
       { tz: 'Europe/Berlin',    label: 'Berlin',      flag: '🇩🇪', country: 'Germany' },
