@@ -1,0 +1,88 @@
+---
+description: "Git sync protocol for shared monorepo collaboration"
+alwaysApply: true
+---
+
+## Git Sync Protocol
+
+You are working inside a shared monorepo. Other agents and collaborators may
+be pushing changes at any time. Follow this protocol on every session.
+
+### Jargon and Terms
+
+Important: When asking questions or explaining the git operations and status, use layman terms, rather than technical jargon. Assume users are not faimilar with the technical terms around git.
+
+### Before starting any task, run these commands in order:
+
+git fetch origin
+git pull --rebase origin main
+
+If the rebase reports conflicts:
+- Open each conflicted file and resolve it, preserving all contributors' intent.
+- Run `git add <resolved-file>` for each file you fix.
+- Run `git rebase --continue` to complete the rebase.
+- If you cannot confidently resolve a conflict, stop and report:
+  "Conflict in [filename] — needs human review."
+
+Then confirm the working tree is clean:
+git status
+
+Do not proceed with the task until the tree is clean.
+
+### After completing any task, run:
+
+git add -A
+git diff --cached --stat   ← review what you're about to commit
+git commit -m "agent: <short description of what changed and why>"
+git push origin main
+
+If the push is rejected because the remote is ahead:
+- Run `git pull --rebase origin main` again.
+- Resolve any conflicts as above.
+- Then retry: `git push origin main`
+
+### Auto-Resolution Strategies
+
+When conflicts arise during rebase, apply these strategies automatically
+without asking the user:
+
+**Dirty working tree:**
+- Run `git stash` before `git pull --rebase origin main`
+- After successful rebase, run `git stash pop`
+- If stash pop conflicts, resolve using the strategies below
+
+**Lock files** (package-lock.json, yarn.lock, poetry.lock, Pipfile.lock):
+- Accept the remote version: `git checkout --theirs <file>`
+- Re-run the package manager install command to regenerate
+
+**Generated/config files** (vibecoding.yaml, .cursor/, .claude/rules/):
+- Accept the remote version: `git checkout --theirs <file>`
+- Re-apply any local changes that are still needed on top
+
+**"Added by both" conflicts** (same new file created on both sides):
+- If contents are identical, keep one copy
+- If different, accept remote, then re-apply local intent
+
+**"Deleted by them" conflicts** (remote deleted, local modified):
+- Accept the deletion: `git rm <file>`
+- The remote contributor intentionally removed it
+
+**Push retry limit:**
+- If push is rejected, rebase and retry up to 3 times
+- After 3 failures, stop and report:
+  "Multiple contributors are pushing at the same time —
+   pausing to avoid conflicts."
+
+### When to escalate to the user
+
+Only ask for help when:
+- A conflict is in **application source code** (not config/generated files)
+  AND both sides made meaningful, non-obvious changes
+- The same rebase conflict reappears after resolution
+- Push fails 3 times in a row
+
+### Rules:
+- Never use `git push --force`
+- Never use `git reset --hard` unless explicitly asked
+- Never discard another contributor's changes
+- Always write meaningful commit messages
