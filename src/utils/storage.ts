@@ -12,7 +12,11 @@ export function loadFromStorage(): StorageSchema {
     if (!raw) return defaultSchema();
     const parsed = JSON.parse(raw) as Partial<StorageSchema>;
     if (parsed.version !== 1) return defaultSchema();
-    return parsed as StorageSchema;
+    const schema = parsed as StorageSchema;
+    return {
+      ...schema,
+      zones: migrateZones(schema.zones),
+    };
   } catch {
     return defaultSchema();
   }
@@ -48,4 +52,34 @@ function defaultSchema(): StorageSchema {
       myTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
   };
+}
+
+function migrateZones(zones: Zone[] | undefined): Zone[] {
+  if (!zones) return DEFAULT_ZONES;
+  return zones.map((zone) => {
+    if (!zone.workHours) return zone;
+    const wh = zone.workHours;
+    return {
+      ...zone,
+      workHours: {
+        fringeStart: normalizeMinutesValue(wh.fringeStart),
+        coreStart: normalizeMinutesValue(wh.coreStart),
+        coreEnd: normalizeMinutesValue(wh.coreEnd),
+        fringeEnd: normalizeMinutesValue(wh.fringeEnd),
+      },
+    };
+  });
+}
+
+/**
+ * Backward compatibility:
+ * - Legacy saved values were whole hours (0..23)
+ * - New values are minutes since midnight (0..1439) in 30-minute increments
+ */
+function normalizeMinutesValue(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  const legacyHourLike = value >= 0 && value <= 24;
+  const minutes = legacyHourLike ? value * 60 : value;
+  const snapped = Math.round(minutes / 30) * 30;
+  return Math.max(0, Math.min(snapped, 23 * 60 + 30));
 }

@@ -1,8 +1,9 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, GripVertical, RotateCcw } from 'lucide-react';
-import type { Zone, HourBlock, WorkHours } from '@/types';
+import type { Zone, HourBlock, WorkHours, WorkClass } from '@/types';
 import { DEFAULT_WORK_HOURS } from '@/utils/constants';
-import { formatTimeInZone, getUtcOffsetLabel, classifyHour } from '@/utils/timezones';
+import { formatTimeInZone, getUtcOffsetLabel, classifyMinute } from '@/utils/timezones';
 
 interface Props {
   zone: Zone;
@@ -20,17 +21,39 @@ interface Props {
   onDragEnd: () => void;
   onUpdateWorkHours: (id: string, wh: WorkHours) => void;
   onResetWorkHours: (id: string) => void;
+  overlapColumns?: boolean[] | null;
+  isReference?: boolean;
+  onToggleReference?: (id: string) => void;
 }
 
 // ─── Boundary handle ──────────────────────────────────────────────────────────
 
-/** Find the column (0-23) whose left edge is the best position for a boundary hour */
-function boundaryToCol(hour: number, blocks: HourBlock[]): number {
-  const idx = blocks.findIndex((b) => b.hour === hour);
-  if (idx >= 0) return idx;
-  // DST gap: find first column whose local hour exceeds the boundary
-  const next = blocks.findIndex((b) => b.hour > hour);
-  return next >= 0 ? next : blocks.length;
+/** Find column position for a boundary minute in local time. */
+function boundaryToCol(localMinutes: number, blocks: HourBlock[]): number {
+  if (blocks.length === 0) return 0;
+  const target = ((localMinutes % 1440) + 1440) % 1440;
+  const first = blocks[0].localMinutes;
+
+  // Walk half-hour marks across the row's local-time timeline and find exact match.
+  for (let halfStep = 0; halfStep <= 48; halfStep++) {
+    const minuteAtStep = (first + halfStep * 30) % (24 * 60);
+    if (minuteAtStep === target) return halfStep / 2;
+  }
+
+  // DST gap fallback: use nearest half-step by circular minute distance.
+  let bestStep = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let halfStep = 0; halfStep <= 48; halfStep++) {
+    const minuteAtStep = (first + halfStep * 30) % (24 * 60);
+    const direct = Math.abs(minuteAtStep - target);
+    const wrapped = 24 * 60 - direct;
+    const distance = Math.min(direct, wrapped);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestStep = halfStep;
+    }
+  }
+  return bestStep / 2;
 }
 
 interface HandleProps {
@@ -65,6 +88,29 @@ function BoundaryHandle({ col, blockWidth, color, onMouseDown }: HandleProps) {
   );
 }
 
+function formatBoundaryHour(localMinutes: number, hour12: boolean): string {
+  const mins = Math.max(0, Math.min(23 * 60 + 30, localMinutes));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (!hour12) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const display = h % 12 === 0 ? 12 : h % 12;
+  return `${display}:${String(m).padStart(2, '0')} ${suffix}`;
+}
+
+function boundaryLabel(boundary: keyof WorkHours): string {
+  if (boundary === 'fringeStart') return 'Early start';
+  if (boundary === 'coreStart') return 'Work start';
+  if (boundary === 'coreEnd') return 'Work end';
+  return 'Late end';
+}
+
+function workClassBg(cls: WorkClass): string {
+  if (cls === 'core') return 'bg-[var(--color-core)]';
+  if (cls === 'fringe') return 'bg-[var(--color-fringe)]';
+  return 'bg-[var(--color-off)]';
+}
+
 // ─── TimelineRow ──────────────────────────────────────────────────────────────
 
 export function TimelineRow({
@@ -72,19 +118,25 @@ export function TimelineRow({
   index, isDragging, isDropTarget,
   onRemove, onDragStart, onDragOver, onDrop, onDragEnd,
   onUpdateWorkHours, onResetWorkHours,
+  overlapColumns = null,
+  isReference = false,
+  onToggleReference,
 }: Props) {
   const currentTime = formatTimeInZone(needleUtcMs, zone.tz, hour12);
   const utcOffset = getUtcOffsetLabel(zone.tz, needleUtcMs);
 
   // Compute work class at needle time for background color
-  const localHour = parseInt(
-    new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hour12: false, timeZone: zone.tz }).format(
-      new Date(needleUtcMs)
-    ),
-    10
-  );
+  const localParts = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: zone.tz,
+  }).formatToParts(new Date(needleUtcMs));
+  const localHour = parseInt(localParts.find((p) => p.type === 'hour')?.value ?? '0', 10) % 24;
+  const localMinute = parseInt(localParts.find((p) => p.type === 'minute')?.value ?? '0', 10);
+  const localMinutes = localHour * 60 + localMinute;
   const wh = zone.workHours ?? DEFAULT_WORK_HOURS;
-  const needleWorkClass = classifyHour(localHour, wh);
+  const needleWorkClass = classifyMinute(localMinutes, wh);
 
   const infoPanelBgClass =
     needleWorkClass === 'core' ? 'bg-green-100' :
@@ -111,6 +163,13 @@ export function TimelineRow({
   const whRef = useRef<WorkHours>(wh);
   useEffect(() => { whRef.current = wh; });
 
+  const [dragPreview, setDragPreview] = useState<{
+    boundary: keyof WorkHours;
+    localMinutes: number;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
+
   // ── Work-hours boundary drag ────────────────────────────────────────────────
 
   const startBoundaryDrag = useCallback(
@@ -121,6 +180,12 @@ export function TimelineRow({
       // Capture blockWidth and hourBlocks at drag-start time
       const bw = blockWidth;
       const blocks = hourBlocks;
+      setDragPreview({
+        boundary,
+        localMinutes: whRef.current[boundary],
+        clientX: e.clientX,
+        clientY: e.clientY,
+      });
 
       document.body.style.cursor = 'ew-resize';
       document.body.style.userSelect = 'none';
@@ -128,23 +193,31 @@ export function TimelineRow({
       const onMove = (ev: MouseEvent) => {
         if (!blocksRef.current) return;
         const rect = blocksRef.current.getBoundingClientRect();
-        const px = Math.max(0, ev.clientX - rect.left);
-        const col = Math.min(23, Math.floor(px / bw));
-        const newHour = blocks[col]?.hour ?? col;
+        const px = Math.max(0, Math.min(ev.clientX - rect.left, bw * 24 - 1));
+        const colFloat = px / bw;
+        const halfStep = Math.max(0, Math.min(48, Math.round(colFloat * 2)));
+        const first = blocks[0]?.localMinutes ?? 0;
+        const candidateMinutes = (first + halfStep * 30) % (24 * 60);
 
         const cur = whRef.current;
         const next = { ...cur };
 
         if (boundary === 'fringeStart') {
-          next.fringeStart = Math.max(0, Math.min(newHour, cur.coreStart - 1));
+          next.fringeStart = Math.max(0, Math.min(candidateMinutes, cur.coreStart - 30));
         } else if (boundary === 'coreStart') {
-          next.coreStart = Math.max(cur.fringeStart + 1, Math.min(newHour, cur.coreEnd - 1));
+          next.coreStart = Math.max(cur.fringeStart + 30, Math.min(candidateMinutes, cur.coreEnd - 30));
         } else if (boundary === 'coreEnd') {
-          next.coreEnd = Math.max(cur.coreStart + 1, Math.min(newHour, cur.fringeEnd - 1));
+          next.coreEnd = Math.max(cur.coreStart + 30, Math.min(candidateMinutes, cur.fringeEnd - 30));
         } else if (boundary === 'fringeEnd') {
-          next.fringeEnd = Math.max(cur.coreEnd + 1, Math.min(newHour, 23));
+          next.fringeEnd = Math.max(cur.coreEnd + 30, Math.min(candidateMinutes, 23 * 60 + 30));
         }
 
+        setDragPreview({
+          boundary,
+          localMinutes: next[boundary],
+          clientX: ev.clientX,
+          clientY: ev.clientY,
+        });
         onUpdateWorkHours(zone.id, next);
       };
 
@@ -153,6 +226,7 @@ export function TimelineRow({
         document.body.style.userSelect = '';
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
+        setDragPreview(null);
       };
 
       document.addEventListener('mousemove', onMove);
@@ -170,29 +244,30 @@ export function TimelineRow({
   const hasCustomWorkHours = zone.workHours !== undefined;
 
   return (
-    <div
-      draggable
-      onDragStart={(e) => {
-        if (!fromHandle.current) { e.preventDefault(); return; }
-        const ghost = document.createElement('div');
-        ghost.style.cssText = 'width:1px;height:1px;opacity:0;position:fixed;top:-9999px';
-        document.body.appendChild(ghost);
-        e.dataTransfer.setDragImage(ghost, 0, 0);
-        setTimeout(() => document.body.removeChild(ghost), 0);
-        onDragStart(index);
-      }}
-      onDragOver={(e) => onDragOver(e, index)}
-      onDrop={() => onDrop(index)}
-      onDragEnd={onDragEnd}
-      className={[
-        'flex items-stretch border-b border-slate-100 last:border-b-0 group transition-all duration-150',
-        isDragging ? 'opacity-40' : 'opacity-100',
-        isDropTarget ? 'border-t-2 border-t-blue-400' : '',
-        !isDragging ? 'hover:bg-slate-50/60' : '',
-      ].join(' ')}
-    >
-      {/* Info panel */}
-      <div className={`flex items-center gap-2 px-3 py-4 ${infoPanelBgClass} border-r border-slate-100 shrink-0 w-56`}>
+    <>
+      <div
+        draggable
+        onDragStart={(e) => {
+          if (!fromHandle.current) { e.preventDefault(); return; }
+          const ghost = document.createElement('div');
+          ghost.style.cssText = 'width:1px;height:1px;opacity:0;position:fixed;top:-9999px';
+          document.body.appendChild(ghost);
+          e.dataTransfer.setDragImage(ghost, 0, 0);
+          setTimeout(() => document.body.removeChild(ghost), 0);
+          onDragStart(index);
+        }}
+        onDragOver={(e) => onDragOver(e, index)}
+        onDrop={() => onDrop(index)}
+        onDragEnd={onDragEnd}
+        className={[
+          'flex items-stretch border-b border-slate-100 last:border-b-0 group transition-all duration-150',
+          isDragging ? 'opacity-40' : 'opacity-100',
+          isDropTarget ? 'border-t-2 border-t-blue-400' : '',
+          !isDragging ? 'hover:bg-slate-50/60' : '',
+        ].join(' ')}
+      >
+        {/* Info panel */}
+        <div className={`flex items-center gap-2 px-3 py-4 ${infoPanelBgClass} border-r border-slate-100 shrink-0 w-56 ${isReference ? 'border-l-4 border-l-indigo-400' : ''}`}>
         {/* Row-reorder drag grip */}
         <div
           className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 shrink-0 touch-none"
@@ -203,18 +278,25 @@ export function TimelineRow({
           <GripVertical className="w-4 h-4" />
         </div>
 
-        <span className="text-2xl leading-none select-none" aria-hidden="true">{zone.flag}</span>
+        <button
+          type="button"
+          onClick={() => onToggleReference?.(zone.id)}
+          className="flex flex-1 min-w-0 items-center gap-2 text-left rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+          title="Click to compare overlaps from this location"
+        >
+          <span className="text-2xl leading-none select-none" aria-hidden="true">{zone.flag}</span>
 
-        <div className="flex-1 min-w-0">
-          <div className={`font-semibold text-sm ${timeLabelTextClass} truncate leading-tight`}>{zone.label}</div>
-          {zone.person && (
-            <div className="text-xs text-slate-500 truncate mt-0.5">{zone.person}</div>
-          )}
-          <div className="flex items-baseline gap-1.5 mt-1">
-            <span className={`text-base font-bold ${timeDisplayTextClass} tabular-nums`}>{currentTime}</span>
-            <span className="text-xs text-slate-500 font-medium">{utcOffset}</span>
+          <div className="flex-1 min-w-0">
+            <div className={`font-semibold text-sm ${timeLabelTextClass} truncate leading-tight`}>{zone.label}</div>
+            {zone.person && (
+              <div className="text-xs text-slate-500 truncate mt-0.5">{zone.person}</div>
+            )}
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className={`text-base font-bold ${timeDisplayTextClass} tabular-nums`}>{currentTime}</span>
+              <span className="text-xs text-slate-500 font-medium">{utcOffset}</span>
+            </div>
           </div>
-        </div>
+        </button>
 
         <div className="flex items-center gap-0.5 shrink-0">
           {/* Per-zone reset — only visible when zone has custom work hours */}
@@ -239,15 +321,27 @@ export function TimelineRow({
         </div>
       </div>
 
-      {/* Hour blocks + boundary handles */}
-      <div ref={blocksRef} className="relative flex h-[72px]">
-        {hourBlocks.map((block) => (
+        {/* Hour blocks + boundary handles */}
+        <div ref={blocksRef} className="relative flex h-[72px]">
+        {hourBlocks.map((block, colIndex) => (
+          // Paint each hour block in two 30-minute halves so boundaries
+          // at :30 start exactly at the handle location.
+          (() => {
+            const leftClass = classifyMinute((block.localMinutes + 15) % (24 * 60), wh);
+            const rightClass = classifyMinute((block.localMinutes + 45) % (24 * 60), wh);
+            return (
           <div
-            key={block.hour}
+            key={`${block.utcMs}-${colIndex}`}
             style={{ width: blockWidth, minWidth: blockWidth }}
-            className={`hour-block ${block.workClass}`}
-            title={`${String(block.hour).padStart(2, '0')}:00 local`}
-          />
+            className="hour-block relative bg-[var(--color-off)]"
+            title={`${String(Math.floor(block.localMinutes / 60)).padStart(2, '0')}:${String(block.localMinutes % 60).padStart(2, '0')} local`}
+          >
+            <div className={`absolute inset-y-0 left-0 w-1/2 ${workClassBg(leftClass)}`} />
+            <div className={`absolute inset-y-0 right-0 w-1/2 ${workClassBg(rightClass)}`} />
+            {overlapColumns?.[colIndex] && <div className="hour-block-overlap" />}
+          </div>
+            );
+          })()
         ))}
 
         {/* Fringe-start handle (amber) */}
@@ -278,7 +372,32 @@ export function TimelineRow({
           color="amber"
           onMouseDown={(e) => startBoundaryDrag(e, 'fringeEnd')}
         />
+        </div>
       </div>
-    </div>
+      {dragPreview &&
+        createPortal(
+          <div
+            role="tooltip"
+            aria-live="polite"
+            style={{
+              position: 'fixed',
+              left: dragPreview.clientX,
+              top: dragPreview.clientY + 18,
+              transform: 'translateX(-50%)',
+              pointerEvents: 'none',
+              zIndex: 9999,
+            }}
+            className="bg-slate-900 text-white rounded-md shadow-xl px-2.5 py-1.5 border border-slate-700"
+          >
+            <div className="text-[10px] text-slate-300 leading-none mb-1">
+              {boundaryLabel(dragPreview.boundary)}
+            </div>
+            <div className="text-xs font-semibold tabular-nums leading-none">
+              {formatBoundaryHour(dragPreview.localMinutes, hour12)}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

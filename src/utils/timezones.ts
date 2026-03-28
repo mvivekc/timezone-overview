@@ -42,10 +42,16 @@ export function getUtcOffsetLabel(ianaZone: string, utcMs: number): string {
 
 // ─── Working hour classification ─────────────────────────────────────────────
 
-export function classifyHour(hour: number, wh: WorkHours = DEFAULT_WORK_HOURS): WorkClass {
-  if (hour >= wh.coreStart && hour < wh.coreEnd) return 'core';
-  if (hour >= wh.fringeStart && hour < wh.fringeEnd) return 'fringe';
+export function classifyMinute(localMinutes: number, wh: WorkHours = DEFAULT_WORK_HOURS): WorkClass {
+  const minute = ((localMinutes % 1440) + 1440) % 1440;
+  if (minute >= wh.coreStart && minute < wh.coreEnd) return 'core';
+  if (minute >= wh.fringeStart && minute < wh.fringeEnd) return 'fringe';
   return 'off';
+}
+
+// Backward-compatible alias for existing call sites.
+export function classifyHour(hour: number, wh: WorkHours = DEFAULT_WORK_HOURS): WorkClass {
+  return classifyMinute(hour * 60, wh);
 }
 
 /** Hour label for the ruler: 24h → "09", 12h → "9a" / "12p" */
@@ -60,30 +66,8 @@ export function hourRulerLabel(h: number, hour12: boolean): string {
 // ─── Midnight anchor ─────────────────────────────────────────────────────────
 
 export function getLocalMidnightAsUTC(dateString: string, ianaZone: string): number {
-  // Binary-search approach: find the UTC ms where it is exactly 00:00:00
-  // in ianaZone on dateString. This correctly handles all DST edge cases
-  // regardless of the browser's own timezone.
   const [y, m, d] = dateString.split('-').map(Number);
-
-  // Rough UTC midnight for the date (off by at most ±14 hours due to timezone spread)
-  const roughUtc = Date.UTC(y, m - 1, d, 12, 0, 0); // noon UTC as starting point
-
-  // Binary search over ±15 hours around noon UTC to find the 00:00 local crossing
-  let lo = roughUtc - 15 * 3_600_000;
-  let hi = roughUtc + 15 * 3_600_000;
-
-  for (let i = 0; i < 40; i++) {
-    const mid = Math.floor((lo + hi) / 2);
-    const localMinutes = getLocalMinutesSinceMidnight(mid, ianaZone, dateString);
-    if (localMinutes === null || localMinutes > 0) {
-      hi = mid;
-    } else {
-      lo = mid;
-    }
-    if (hi - lo <= 1000) break;
-  }
-
-  return hi;
+  return getUtcForLocalDateTime(y, m, d, 0, 0, ianaZone);
 }
 
 /**
@@ -105,6 +89,83 @@ function getLocalMinutesSinceMidnight(utcMs: number, ianaZone: string, dateStrin
   const min = parseInt(get('minute'), 10);
   // Handle 24:00 edge case some engines emit
   return h === 24 ? 0 : h * 60 + min;
+}
+
+interface LocalDateParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+}
+
+function getLocalDateParts(utcMs: number, ianaZone: string): LocalDateParts {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: ianaZone,
+  });
+  const parts = fmt.formatToParts(new Date(utcMs));
+  const read = (type: string): number => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10);
+  const rawHour = read('hour');
+  return {
+    year: read('year'),
+    month: read('month'),
+    day: read('day'),
+    hour: rawHour === 24 ? 0 : rawHour,
+    minute: read('minute'),
+  };
+}
+
+function minutesDeltaFromDesired(
+  actual: LocalDateParts,
+  desiredY: number,
+  desiredM: number,
+  desiredD: number,
+  desiredHour: number,
+  desiredMinute: number,
+): number {
+  const actualPseudoUtc = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute);
+  const desiredPseudoUtc = Date.UTC(desiredY, desiredM - 1, desiredD, desiredHour, desiredMinute);
+  return Math.round((actualPseudoUtc - desiredPseudoUtc) / 60_000);
+}
+
+/**
+ * Convert a local wall-clock time in a target timezone to the corresponding UTC ms.
+ * Uses iterative offset correction and a minute-scan fallback for robustness.
+ */
+function getUtcForLocalDateTime(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  ianaZone: string,
+): number {
+  // Initial UTC guess (same wall-clock interpreted in UTC), then refine.
+  let guess = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+
+  for (let i = 0; i < 6; i++) {
+    const local = getLocalDateParts(guess, ianaZone);
+    const deltaMinutes = minutesDeltaFromDesired(local, year, month, day, hour, minute);
+    if (deltaMinutes === 0) return guess;
+    guess -= deltaMinutes * 60_000;
+  }
+
+  // Fallback scan within +/- 36 hours to find an exact local match.
+  const targetDate = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const start = guess - 36 * 3_600_000;
+  const end = guess + 36 * 3_600_000;
+  for (let t = start; t <= end; t += 60_000) {
+    const localMinutes = getLocalMinutesSinceMidnight(t, ianaZone, targetDate);
+    if (localMinutes === hour * 60 + minute) return t;
+  }
+
+  return guess;
 }
 
 
@@ -130,17 +191,26 @@ export function buildHourBlocks(
     // UTC instant at the start of column col (= hour col in myTimezone)
     const utcMs = refMidnightUtc + col * 3_600_000;
 
-    // What local hour is it in ianaZone at this UTC instant?
-    const localHour = parseInt(
-      new Intl.DateTimeFormat('en-GB', {
-        hour: '2-digit',
-        hour12: false,
-        timeZone: ianaZone,
-      }).format(new Date(utcMs)),
-      10,
-    );
+    // What local minute is it in ianaZone at this UTC instant?
+    const localParts = new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: ianaZone,
+    }).formatToParts(new Date(utcMs));
+    const localHour = parseInt(localParts.find((p) => p.type === 'hour')?.value ?? '0', 10) % 24;
+    const localMinute = parseInt(localParts.find((p) => p.type === 'minute')?.value ?? '0', 10);
+    const localMinutes = localHour * 60 + localMinute;
 
-    blocks.push({ hour: localHour, utcMs, workClass: classifyHour(localHour, wh) });
+    // Use block midpoint for classification so 30-min boundaries are reflected.
+    const localMinutesMidpoint = (localMinutes + 30) % (24 * 60);
+
+    blocks.push({
+      hour: localHour,
+      localMinutes,
+      utcMs,
+      workClass: classifyMinute(localMinutesMidpoint, wh),
+    });
   }
 
   return blocks;

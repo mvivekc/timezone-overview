@@ -1,4 +1,4 @@
-import { useReducer, useOptimistic, useEffect, useCallback, useState } from 'react';
+import { useReducer, useEffect, useCallback, useState } from 'react';
 import type { AppState, AppAction, Zone, WorkHours } from './types';
 import { loadFromStorage, saveToStorage } from './utils/storage';
 import { todayString } from './utils/timezones';
@@ -84,11 +84,7 @@ function buildInitialState(): AppState {
 export function App() {
   const [state, dispatch] = useReducer(reducer, undefined, buildInitialState);
   const [modalOpen, setModalOpen] = useState(false);
-
-  const [optimisticZones, addOptimisticZone] = useOptimistic(
-    state.zones,
-    (current: Zone[], newZone: Zone) => [...current, newZone]
-  );
+  const [selectedReferenceZoneId, setSelectedReferenceZoneId] = useState<string | null>(null);
 
   // Live mode tick
   useEffect(() => {
@@ -117,9 +113,8 @@ export function App() {
   }, []);
 
   const handleAddZone = useCallback((zone: Zone) => {
-    addOptimisticZone(zone);
     dispatch({ type: 'ADD_ZONE', payload: zone });
-  }, [addOptimisticZone]);
+  }, []);
 
   const handleRemoveZone = useCallback((id: string) => {
     dispatch({ type: 'REMOVE_ZONE', payload: id });
@@ -141,8 +136,18 @@ export function App() {
     dispatch({ type: 'RESET_ALL_WORK_HOURS' });
   }, []);
 
-  const showWarning = !state.dismissedWarning && optimisticZones.length > ZONE_WARNING_THRESHOLD;
-  const hasCustomWorkHours = optimisticZones.some((z) => z.workHours !== undefined);
+  const handleToggleReferenceZone = useCallback((id: string) => {
+    setSelectedReferenceZoneId((prev) => (prev === id ? null : id));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedReferenceZoneId) return;
+    const stillExists = state.zones.some((zone) => zone.id === selectedReferenceZoneId);
+    if (!stillExists) setSelectedReferenceZoneId(null);
+  }, [state.zones, selectedReferenceZoneId]);
+
+  const showWarning = !state.dismissedWarning && state.zones.length > ZONE_WARNING_THRESHOLD;
+  const hasCustomWorkHours = state.zones.some((z) => z.workHours !== undefined);
 
   return (
     <>
@@ -169,7 +174,7 @@ export function App() {
             <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
               <span>
-                You have <strong>{optimisticZones.length}</strong> timezones — horizontal scrolling may be needed on smaller screens.
+                You have <strong>{state.zones.length}</strong> timezones — horizontal scrolling may be needed on smaller screens.
               </span>
               <button
                 onClick={() => dispatch({ type: 'DISMISS_WARNING' })}
@@ -213,7 +218,7 @@ export function App() {
           </div>
 
           {/* Timeline */}
-          {optimisticZones.length === 0 ? (
+          {state.zones.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-slate-400 gap-3">
               <p className="text-lg">No timezones yet</p>
               <button
@@ -224,20 +229,24 @@ export function App() {
               </button>
             </div>
           ) : (
-            <TimelineGrid
-              zones={optimisticZones}
-              selectedDate={state.selectedDate}
-              needleUtcMs={state.needleUtcMs}
-              isLive={state.isLive}
-              hour12={state.hour12}
-              myTimezone={state.myTimezone}
-              onRemoveZone={handleRemoveZone}
-              onReorderZones={handleReorderZones}
-              onNeedleChange={handleNeedleChange}
-              onExitLive={handleExitLive}
-              onUpdateZoneWorkHours={handleUpdateZoneWorkHours}
-              onResetZoneWorkHours={handleResetZoneWorkHours}
-            />
+            <>
+              <TimelineGrid
+                zones={state.zones}
+                selectedDate={state.selectedDate}
+                needleUtcMs={state.needleUtcMs}
+                isLive={state.isLive}
+                hour12={state.hour12}
+                myTimezone={state.myTimezone}
+                selectedReferenceZoneId={selectedReferenceZoneId}
+                onRemoveZone={handleRemoveZone}
+                onReorderZones={handleReorderZones}
+                onNeedleChange={handleNeedleChange}
+                onExitLive={handleExitLive}
+                onUpdateZoneWorkHours={handleUpdateZoneWorkHours}
+                onResetZoneWorkHours={handleResetZoneWorkHours}
+                onToggleReferenceZone={handleToggleReferenceZone}
+              />
+            </>
           )}
         </main>
 

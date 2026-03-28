@@ -3,13 +3,20 @@ import { hourRulerLabel } from '@/utils/timezones';
 interface Props {
   blockWidth: number;
   hour12: boolean;
+  myTimezone: string;
 }
 
-export function HourRuler({ blockWidth, hour12 }: Props) {
+export function HourRuler({ blockWidth, hour12, myTimezone }: Props) {
+  const tzLabel = myTimezone.replace(/_/g, ' ');
+
   return (
     <div className="flex sticky top-0 z-10 bg-slate-50 border-b border-slate-200">
       {/* Spacer aligned with the info panel (w-56 = 224px) */}
-      <div className="w-56 shrink-0" />
+      <div className="w-56 shrink-0 flex items-center px-3">
+        <span className="text-[11px] text-slate-500 font-medium truncate">
+          00-23 in {tzLabel}
+        </span>
+      </div>
 
       {/* 24 hour labels */}
       <div className="flex">

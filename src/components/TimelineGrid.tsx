@@ -1,10 +1,12 @@
 import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import type { Zone, WorkHours } from '@/types';
 import { buildHourBlocks } from '@/utils/timezones';
+import { computeOverlapColumns, computeTeamOverlapColumns, computeTeamOverlapMinutes } from '@/utils/overlaps';
 import { HOUR_WIDTH_PX } from '@/utils/constants';
 import { HourRuler } from './HourRuler';
 import { TimelineRow } from './TimelineRow';
 import { Needle } from './Needle';
+import { TeamOverlapRow } from './TeamOverlapRow';
 
 const INFO_PANEL_WIDTH = 224; // matches w-56
 
@@ -15,18 +17,22 @@ interface Props {
   isLive: boolean;
   hour12: boolean;
   myTimezone: string;
+  selectedReferenceZoneId: string | null;
   onRemoveZone: (id: string) => void;
   onReorderZones: (zones: Zone[]) => void;
   onNeedleChange: (utcMs: number) => void;
   onExitLive: () => void;
   onUpdateZoneWorkHours: (id: string, wh: WorkHours) => void;
   onResetZoneWorkHours: (id: string) => void;
+  onToggleReferenceZone: (id: string) => void;
 }
 
 export function TimelineGrid({
   zones, selectedDate, needleUtcMs, isLive, hour12, myTimezone,
+  selectedReferenceZoneId,
   onRemoveZone, onReorderZones, onNeedleChange, onExitLive,
   onUpdateZoneWorkHours, onResetZoneWorkHours,
+  onToggleReferenceZone,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [blockWidth, setBlockWidth] = useState(HOUR_WIDTH_PX);
@@ -82,10 +88,36 @@ export function TimelineGrid({
     [zones, selectedDate, myTimezone],
   );
 
+  const overlapColumnsByZone = useMemo(() => {
+    if (!selectedReferenceZoneId) return new Map<string, boolean[] | null>();
+    const referenceZone = zones.find((zone) => zone.id === selectedReferenceZoneId);
+    if (!referenceZone) return new Map<string, boolean[] | null>();
+
+    const map = new Map<string, boolean[] | null>();
+    for (const zone of zones) {
+      if (zone.id === referenceZone.id) {
+        map.set(zone.id, null);
+        continue;
+      }
+      map.set(zone.id, computeOverlapColumns(referenceZone, zone, selectedDate, myTimezone));
+    }
+    return map;
+  }, [zones, selectedReferenceZoneId, selectedDate, myTimezone]);
+
+  const teamOverlapColumns = useMemo(
+    () => computeTeamOverlapColumns(zones, selectedDate, myTimezone),
+    [zones, selectedDate, myTimezone],
+  );
+
+  const teamOverlapMinutes = useMemo(
+    () => computeTeamOverlapMinutes(zones, selectedDate, myTimezone),
+    [zones, selectedDate, myTimezone],
+  );
+
   return (
     <div className="relative bg-white rounded-xl shadow-sm border border-slate-200">
       <div className="timeline-scroll" ref={scrollRef}>
-        <HourRuler blockWidth={blockWidth} hour12={hour12} />
+        <HourRuler blockWidth={blockWidth} hour12={hour12} myTimezone={myTimezone} />
 
         <div className="relative">
           {zoneBlocks.map(({ zone, blocks }, i) => (
@@ -106,8 +138,19 @@ export function TimelineGrid({
               onDragEnd={handleDragEnd}
               onUpdateWorkHours={onUpdateZoneWorkHours}
               onResetWorkHours={onResetZoneWorkHours}
+              overlapColumns={overlapColumnsByZone.get(zone.id) ?? null}
+              isReference={selectedReferenceZoneId === zone.id}
+              onToggleReference={onToggleReferenceZone}
             />
           ))}
+
+          {zones.length > 1 && (
+            <TeamOverlapRow
+              blockWidth={blockWidth}
+              overlapColumns={teamOverlapColumns}
+              durationMinutes={teamOverlapMinutes}
+            />
+          )}
 
           {zones.length > 0 && (
             <Needle

@@ -6,8 +6,10 @@ export const INFO_PANEL_WIDTH_PX = 200;
 export const STORAGE_KEY = 'tz-helper-v1';
 export const ZONE_WARNING_THRESHOLD = 6;
 
-export const WORK_CORE = { start: 9, end: 18 };   // green
-export const WORK_FRINGE = { start: 7, end: 20 }; // amber
+const hm = (hours: number, minutes = 0) => hours * 60 + minutes;
+
+export const WORK_CORE = { start: hm(9), end: hm(18) };   // green
+export const WORK_FRINGE = { start: hm(7), end: hm(20) }; // amber
 
 export const DEFAULT_WORK_HOURS: WorkHours = {
   fringeStart: WORK_FRINGE.start,

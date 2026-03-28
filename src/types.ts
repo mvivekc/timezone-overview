@@ -1,8 +1,10 @@
 export interface WorkHours {
-  fringeStart: number;  // 0–23, e.g. 7
-  coreStart: number;    // e.g. 9
-  coreEnd: number;      // e.g. 18
-  fringeEnd: number;    // e.g. 20
+  // Minutes since local midnight (0..1439), stored in 30-minute steps.
+  // Example: 07:30 => 450, 18:00 => 1080
+  fringeStart: number;
+  coreStart: number;
+  coreEnd: number;
+  fringeEnd: number;
 }
 
 export interface Zone {
@@ -18,6 +20,7 @@ export type WorkClass = 'core' | 'fringe' | 'off';
 
 export interface HourBlock {
   hour: number;       // 0–23 local hour
+  localMinutes: number; // local minute-of-day at block start (0..1439)
   utcMs: number;      // UTC ms for start of this hour block
   workClass: WorkClass;
 }

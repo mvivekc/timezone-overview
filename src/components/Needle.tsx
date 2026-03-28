@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { utcMsToPixel, pixelToUtcMs, formatTimeInZone, getUtcOffsetLabel, classifyHour } from '@/utils/timezones';
+import { utcMsToPixel, pixelToUtcMs, formatTimeInZone, getUtcOffsetLabel, classifyMinute } from '@/utils/timezones';
 import { DEFAULT_WORK_HOURS } from '@/utils/constants';
 import type { Zone, WorkClass } from '@/types';
 
@@ -152,12 +152,15 @@ const TOOLTIP_WIDTH = 280;
 const TOOLTIP_MARGIN = 12;
 
 function zoneWorkClass(zone: Zone, utcMs: number): WorkClass {
-  const localHour = parseInt(
-    new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hour12: false, timeZone: zone.tz })
-      .format(new Date(utcMs)),
-    10,
-  );
-  return classifyHour(localHour, zone.workHours ?? DEFAULT_WORK_HOURS);
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: zone.tz,
+  }).formatToParts(new Date(utcMs));
+  const localHour = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10) % 24;
+  const localMinute = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10);
+  return classifyMinute(localHour * 60 + localMinute, zone.workHours ?? DEFAULT_WORK_HOURS);
 }
 
 const WORK_DOT: Record<WorkClass, string> = {

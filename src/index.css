@@ -50,6 +50,16 @@
 .hour-block.fringe  { background-color: var(--color-fringe); }
 .hour-block.off     { background-color: var(--color-off); }
 
+.hour-block-overlap {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background-color: rgba(99, 102, 241, 0.45);
+  pointer-events: none;
+}
+
 /* ─── Needle zone (wide transparent hit area) ────────────────────────────────── */
 .needle-zone {
   position: absolute;
