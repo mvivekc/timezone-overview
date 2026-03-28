@@ -111,6 +111,22 @@ function workClassBg(cls: WorkClass): string {
   return 'bg-[var(--color-off)]';
 }
 
+function overlapRuns(slots: boolean[] | null | undefined): Array<{ start: number; end: number }> {
+  if (!slots || slots.length === 0) return [];
+  const runs: Array<{ start: number; end: number }> = [];
+  let start: number | null = null;
+  for (let i = 0; i <= slots.length; i++) {
+    const active = i < slots.length ? slots[i] : false;
+    if (active && start === null) {
+      start = i;
+    } else if (!active && start !== null) {
+      runs.push({ start, end: i });
+      start = null;
+    }
+  }
+  return runs;
+}
+
 // ─── TimelineRow ──────────────────────────────────────────────────────────────
 
 export function TimelineRow({
@@ -242,6 +258,7 @@ export function TimelineRow({
   const fringeEndCol = boundaryToCol(wh.fringeEnd, hourBlocks);
 
   const hasCustomWorkHours = zone.workHours !== undefined;
+  const overlapSlotRuns = overlapRuns(overlapColumns);
 
   return (
     <>
@@ -338,10 +355,20 @@ export function TimelineRow({
           >
             <div className={`absolute inset-y-0 left-0 w-1/2 ${workClassBg(leftClass)}`} />
             <div className={`absolute inset-y-0 right-0 w-1/2 ${workClassBg(rightClass)}`} />
-            {overlapColumns?.[colIndex] && <div className="hour-block-overlap" />}
           </div>
             );
           })()
+        ))}
+
+        {overlapSlotRuns.map((run, idx) => (
+          <div
+            key={`overlap-run-${idx}`}
+            className="hour-block-overlap absolute"
+            style={{
+              left: `${(run.start / 2) * blockWidth}px`,
+              width: `${((run.end - run.start) / 2) * blockWidth}px`,
+            }}
+          />
         ))}
 
         {/* Fringe-start handle (amber) */}

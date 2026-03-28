@@ -59,11 +59,11 @@ function intersectMany(sets: boolean[][]): boolean[] {
   return out;
 }
 
-function toHourColumns(availabilityByMinute: boolean[]): boolean[] {
-  const columns = new Array<boolean>(24).fill(false);
-  for (let hour = 0; hour < 24; hour++) {
-    const start = hour * 60;
-    const end = start + 60;
+function toHalfHourColumns(availabilityByMinute: boolean[]): boolean[] {
+  const columns = new Array<boolean>(48).fill(false);
+  for (let slot = 0; slot < 48; slot++) {
+    const start = slot * 30;
+    const end = start + 30;
     let hasAny = false;
     for (let m = start; m < end; m++) {
       if (availabilityByMinute[m]) {
@@ -71,7 +71,7 @@ function toHourColumns(availabilityByMinute: boolean[]): boolean[] {
         break;
       }
     }
-    columns[hour] = hasAny;
+    columns[slot] = hasAny;
   }
   return columns;
 }
@@ -97,7 +97,7 @@ export function computeOverlapColumns(
   const dayStartUtcMs = getDayStart(selectedDate, myTimezone);
   const availabilityA = buildAvailabilityByMinute(zoneA, dayStartUtcMs);
   const availabilityB = buildAvailabilityByMinute(zoneB, dayStartUtcMs);
-  return toHourColumns(intersectTwo(availabilityA, availabilityB));
+  return toHalfHourColumns(intersectTwo(availabilityA, availabilityB));
 }
 
 export function computeTeamOverlapColumns(
@@ -105,10 +105,10 @@ export function computeTeamOverlapColumns(
   selectedDate: string,
   myTimezone: string,
 ): boolean[] {
-  if (zones.length === 0) return new Array<boolean>(24).fill(false);
+  if (zones.length === 0) return new Array<boolean>(48).fill(false);
   const dayStartUtcMs = getDayStart(selectedDate, myTimezone);
   const sets = zones.map((zone) => buildAvailabilityByMinute(zone, dayStartUtcMs));
-  return toHourColumns(intersectMany(sets));
+  return toHalfHourColumns(intersectMany(sets));
 }
 
 export function computeTeamOverlapMinutes(
