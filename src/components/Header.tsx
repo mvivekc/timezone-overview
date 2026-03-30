@@ -74,14 +74,15 @@ export function Header({
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-      <div className="flex items-center gap-4 px-5 py-3 flex-wrap">
+      {/* Primary row — visible on all screen sizes */}
+      <div className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-2.5 sm:py-3">
 
         {/* Current time in my timezone */}
-        <div className="flex items-center gap-3 shrink-0">
-          <Clock className="w-5 h-5 text-blue-600" />
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-slate-900 tabular-nums leading-none">{localTime}</span>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums leading-none">{localTime}</span>
               {isLive && (
                 <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">
                   <span className="live-dot" />
@@ -89,63 +90,64 @@ export function Header({
                 </span>
               )}
             </div>
-            <div className="text-xs text-slate-400 mt-0.5">{myTimezone.replace(/_/g, ' ')}</div>
+            <div className="text-xs text-slate-400 mt-0.5 hidden sm:block">{myTimezone.replace(/_/g, ' ')}</div>
           </div>
         </div>
 
-        <div className="h-10 w-px bg-slate-200 shrink-0" />
+        <div className="h-10 w-px bg-slate-200 shrink-0 hidden sm:block" />
 
         {/* My timezone selector — searchable */}
-        <div className="flex flex-col gap-0.5 shrink-0">
-          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">My timezone</span>
+        <div className="flex flex-col gap-0.5 flex-1 sm:flex-none shrink-0">
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider hidden sm:block">My timezone</span>
           <SearchableSelect
             groups={COMMON_ZONES}
             value={myTimezone}
             onChange={onSetMyTz}
             placeholder="Search timezone…"
             extraOptions={browserExtra ? [browserExtra] : []}
-            triggerClassName="h-8 w-52"
+            triggerClassName="h-8 w-full sm:w-52"
           />
         </div>
 
-        <div className="h-10 w-px bg-slate-200 shrink-0" />
+        {/* Desktop-only secondary controls inline */}
+        <div className="hidden sm:flex items-center gap-4">
+          <div className="h-10 w-px bg-slate-200 shrink-0" />
 
-        {/* Jump to time — 48 half-hour slots via Radix Select */}
-        <div className="flex flex-col gap-0.5 shrink-0">
-          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Jump to time</span>
-          <Select onValueChange={handleTimeSelect}>
-            <SelectTrigger className="h-8 w-36 text-sm font-mono" aria-label="Jump to time">
-              <SelectValue placeholder="Select time…" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Times in {myTimezone.split('/').pop()?.replace('_', ' ')}</SelectLabel>
-                {timeOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value} className="font-mono">
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
+          {/* Jump to time */}
+          <div className="flex flex-col gap-0.5 shrink-0">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Jump to time</span>
+            <Select onValueChange={handleTimeSelect}>
+              <SelectTrigger className="h-8 w-36 text-sm font-mono" aria-label="Jump to time">
+                <SelectValue placeholder="Select time…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Times in {myTimezone.split('/').pop()?.replace('_', ' ')}</SelectLabel>
+                  {timeOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} className="font-mono">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="h-10 w-px bg-slate-200 shrink-0" />
+          <div className="h-10 w-px bg-slate-200 shrink-0" />
 
-        {/* Date picker */}
-        <div className="flex flex-col gap-0.5 shrink-0">
-          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{dateLabel}</span>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => onDateChange(e.target.value)}
-            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-            aria-label="Select date"
-          />
-        </div>
+          {/* Date picker */}
+          <div className="flex flex-col gap-0.5 shrink-0">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{dateLabel}</span>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => onDateChange(e.target.value)}
+              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              aria-label="Select date"
+            />
+          </div>
 
-        {/* Right side: 12/24h toggle + actions */}
-        <div className="flex items-center gap-2 ml-auto">
+          {/* 12/24h toggle */}
           <div className="flex items-center rounded-lg border border-slate-200 overflow-hidden text-sm">
             <button
               onClick={() => onSetHour12(false)}
@@ -169,20 +171,76 @@ export function Header({
               Back to live
             </Button>
           )}
-
-          <Button size="sm" onClick={onAddZone} className="gap-1.5">
-            <PlusCircle className="w-3.5 h-3.5" />
-            Add timezone
-          </Button>
         </div>
+
+        {/* Add timezone button — always visible */}
+        <Button size="sm" onClick={onAddZone} className="gap-1 sm:gap-1.5 ml-auto shrink-0">
+          <PlusCircle className="w-3.5 h-3.5" />
+          <span className="sm:hidden">Add</span>
+          <span className="hidden sm:inline">Add timezone</span>
+        </Button>
+      </div>
+
+      {/* Secondary row — mobile only */}
+      <div className="sm:hidden flex items-center gap-2 px-4 py-2 border-t border-slate-100">
+        {/* Jump to time */}
+        <Select onValueChange={handleTimeSelect}>
+          <SelectTrigger className="h-8 flex-1 text-sm font-mono" aria-label="Jump to time">
+            <SelectValue placeholder="Jump to time…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel>Times in {myTimezone.split('/').pop()?.replace('_', ' ')}</SelectLabel>
+              {timeOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value} className="font-mono">
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+
+        {/* Date picker */}
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => onDateChange(e.target.value)}
+          className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex-1"
+          aria-label="Select date"
+        />
+
+        {/* 12/24h toggle */}
+        <div className="flex items-center rounded-lg border border-slate-200 overflow-hidden text-sm shrink-0">
+          <button
+            onClick={() => onSetHour12(false)}
+            className={`px-2.5 h-8 font-medium transition-colors ${!hour12 ? 'bg-blue-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+            aria-pressed={!hour12}
+          >
+            24h
+          </button>
+          <button
+            onClick={() => onSetHour12(true)}
+            className={`px-2.5 h-8 font-medium transition-colors ${hour12 ? 'bg-blue-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+            aria-pressed={hour12}
+          >
+            12h
+          </button>
+        </div>
+
+        {!isLive && (
+          <Button variant="outline" size="sm" onClick={onGoLive} className="gap-1 shrink-0">
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span className="sr-only">Back to live</span>
+          </Button>
+        )}
       </div>
 
       {/* Exploring banner */}
       {!isLive && (
-        <div className="px-5 py-1.5 bg-blue-50 border-t border-blue-100 text-xs text-blue-700 flex items-center gap-2">
+        <div className="px-4 sm:px-5 py-1.5 bg-blue-50 border-t border-blue-100 text-xs text-blue-700 flex items-center gap-2">
           <span className="font-semibold">Exploring:</span>
           <span className="font-mono font-bold">{formatTimeInZone(needleUtcMs, myTimezone, hour12)}</span>
-          <span className="text-blue-500">in {myTimezone.replace(/_/g, ' ')}</span>
+          <span className="text-blue-500 hidden sm:inline">in {myTimezone.replace(/_/g, ' ')}</span>
           <button onClick={onGoLive} className="ml-auto text-blue-600 hover:underline font-medium">
             Return to live →
           </button>

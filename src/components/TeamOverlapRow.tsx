@@ -4,6 +4,7 @@ interface Props {
   blockWidth: number;
   overlapColumns: boolean[];
   durationMinutes: number;
+  infoPanelWidth: number;
 }
 
 function overlapRuns(slots: boolean[]): Array<{ start: number; end: number }> {
@@ -31,12 +32,12 @@ function formatDuration(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
-export function TeamOverlapRow({ blockWidth, overlapColumns, durationMinutes }: Props) {
+export function TeamOverlapRow({ blockWidth, overlapColumns, durationMinutes, infoPanelWidth }: Props) {
   const runs = overlapRuns(overlapColumns);
 
   return (
     <div className="flex items-stretch border-t-2 border-slate-200 bg-slate-50/70">
-      <div className="flex items-center gap-2 px-3 py-2 border-r border-slate-200 shrink-0 w-56">
+      <div style={{ width: infoPanelWidth }} className="flex items-center gap-2 px-3 py-2 border-r border-slate-200 shrink-0 sticky left-0 z-[40] bg-slate-50">
         <Users className="w-4 h-4 text-indigo-600 shrink-0" />
         <div className="min-w-0">
           <div className="text-xs font-semibold text-slate-800">Team Overlap</div>

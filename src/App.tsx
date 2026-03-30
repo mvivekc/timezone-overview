@@ -168,7 +168,7 @@ export function App() {
           onAddZone={() => setModalOpen(true)}
         />
 
-        <main className="flex-1 w-full px-5 py-5 flex flex-col gap-4">
+        <main className="flex-1 w-full px-3 py-3 sm:px-5 sm:py-5 flex flex-col gap-4">
 
           {showWarning && (
             <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">

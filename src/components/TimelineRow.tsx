@@ -61,10 +61,10 @@ interface HandleProps {
   col: number;
   blockWidth: number;
   color: 'amber' | 'green';
-  onMouseDown: (e: React.MouseEvent) => void;
+  onPointerDown: (e: React.PointerEvent) => void;
 }
 
-function BoundaryHandle({ col, blockWidth, color, onMouseDown }: HandleProps) {
+function BoundaryHandle({ col, blockWidth, color, onPointerDown }: HandleProps) {
   const lineColor =
     color === 'green'
       ? 'bg-green-500/30 group-hover/bh:bg-green-500/70'
@@ -73,8 +73,8 @@ function BoundaryHandle({ col, blockWidth, color, onMouseDown }: HandleProps) {
   return (
     <div
       style={{ left: col * blockWidth }}
-      className="absolute top-0 bottom-0 w-3 -translate-x-1.5 z-10 cursor-ew-resize group/bh flex items-center justify-center select-none"
-      onMouseDown={onMouseDown}
+      className="absolute top-0 bottom-0 w-6 sm:w-3 -translate-x-3 sm:-translate-x-1.5 z-[1] cursor-ew-resize group/bh flex items-center justify-center select-none touch-none"
+      onPointerDown={onPointerDown}
     >
       <div className={`w-0.5 h-full transition-colors duration-100 ${lineColor}`} />
       {/* Small drag-pill indicator at vertical center */}
@@ -199,9 +199,10 @@ export function TimelineRow({
   // ── Work-hours boundary drag ────────────────────────────────────────────────
 
   const startBoundaryDrag = useCallback(
-    (e: React.MouseEvent, boundary: keyof WorkHours) => {
+    (e: React.PointerEvent, boundary: keyof WorkHours) => {
       e.preventDefault();
       e.stopPropagation();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
       // Capture blockWidth and hourBlocks at drag-start time
       const bw = blockWidth;
@@ -216,7 +217,7 @@ export function TimelineRow({
       document.body.style.cursor = 'ew-resize';
       document.body.style.userSelect = 'none';
 
-      const onMove = (ev: MouseEvent) => {
+      const onMove = (ev: PointerEvent) => {
         if (!blocksRef.current) return;
         const rect = blocksRef.current.getBoundingClientRect();
         const px = Math.max(0, Math.min(ev.clientX - rect.left, bw * 24 - 1));
@@ -253,13 +254,13 @@ export function TimelineRow({
       const onUp = () => {
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
         setDragPreview(null);
       };
 
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
     },
     [blockWidth, hourBlocks, zone.id, onUpdateWorkHours],
   );
@@ -297,7 +298,7 @@ export function TimelineRow({
         ].join(' ')}
       >
         {/* Info panel */}
-        <div className={`flex items-center gap-2 px-3 py-4 ${infoPanelBgClass} border-r border-slate-100 shrink-0 w-72 ${isReference ? 'border-l-4 border-l-indigo-400' : ''}`}>
+        <div className={`flex items-center gap-2 px-2 sm:px-3 py-3 sm:py-4 ${infoPanelBgClass} border-r border-slate-100 shrink-0 w-44 sm:w-72 sticky left-0 z-[40] ${isReference ? 'border-l-4 border-l-indigo-400' : ''}`}>
         {/* Row-reorder drag grip */}
         <div
           className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 shrink-0 touch-none"
@@ -334,7 +335,7 @@ export function TimelineRow({
               onClick={() => onResetWorkHours(zone.id)}
               aria-label={`Reset work hours for ${zone.label}`}
               title="Reset to default work hours"
-              className="p-1.5 rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors duration-200"
+              className="p-2 sm:p-1.5 rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors duration-200"
             >
               <RotateCcw className="w-3.5 h-3.5 stroke-2" />
             </button>
@@ -342,7 +343,7 @@ export function TimelineRow({
           <button
             onClick={() => onRemove(zone.id)}
             aria-label={`Remove ${zone.label}`}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-red-50 hover:text-red-500 text-slate-300 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+            className="transition-opacity p-2 sm:p-1.5 rounded-md hover:bg-red-50 hover:text-red-500 text-slate-300 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -350,7 +351,7 @@ export function TimelineRow({
       </div>
 
         {/* Hour blocks + boundary handles */}
-        <div ref={blocksRef} className="relative flex h-[72px]">
+        <div ref={blocksRef} className="relative flex h-[60px] sm:h-[72px]">
         {hourBlocks.map((block, colIndex) => (
           // Paint each hour block in two 30-minute halves so boundaries
           // at :30 start exactly at the handle location.
@@ -387,28 +388,28 @@ export function TimelineRow({
           col={fringeStartCol}
           blockWidth={blockWidth}
           color="amber"
-          onMouseDown={(e) => startBoundaryDrag(e, 'fringeStart')}
+          onPointerDown={(e) => startBoundaryDrag(e, 'fringeStart')}
         />
         {/* Core-start handle (green) */}
         <BoundaryHandle
           col={coreStartCol}
           blockWidth={blockWidth}
           color="green"
-          onMouseDown={(e) => startBoundaryDrag(e, 'coreStart')}
+          onPointerDown={(e) => startBoundaryDrag(e, 'coreStart')}
         />
         {/* Core-end handle (green) */}
         <BoundaryHandle
           col={coreEndCol}
           blockWidth={blockWidth}
           color="green"
-          onMouseDown={(e) => startBoundaryDrag(e, 'coreEnd')}
+          onPointerDown={(e) => startBoundaryDrag(e, 'coreEnd')}
         />
         {/* Fringe-end handle (amber) */}
         <BoundaryHandle
           col={fringeEndCol}
           blockWidth={blockWidth}
           color="amber"
-          onMouseDown={(e) => startBoundaryDrag(e, 'fringeEnd')}
+          onPointerDown={(e) => startBoundaryDrag(e, 'fringeEnd')}
         />
         </div>
       </div>

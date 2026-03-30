@@ -4,13 +4,12 @@ import { utcMsToPixel, pixelToUtcMs, formatTimeInZone, getUtcOffsetLabel, classi
 import { DEFAULT_WORK_HOURS } from '@/utils/constants';
 import type { Zone, WorkClass } from '@/types';
 
-const INFO_PANEL_WIDTH = 224; // matches w-56
-
 interface Props {
   needleUtcMs: number;
   selectedDate: string;
   isLive: boolean;
   blockWidth: number;
+  infoPanelWidth: number;
   myTimezone: string;
   hour12: boolean;
   zones: Zone[];
@@ -21,7 +20,7 @@ interface Props {
 
 // React 19: ref as plain prop
 export function Needle({
-  needleUtcMs, selectedDate, isLive, blockWidth, myTimezone, hour12, zones,
+  needleUtcMs, selectedDate, isLive, blockWidth, infoPanelWidth, myTimezone, hour12, zones,
   containerRef, onNeedleChange, onExitLive,
 }: Props) {
   const isDragging = useRef(false);
@@ -49,9 +48,9 @@ export function Needle({
     const container = containerRef.current;
     if (!container) return 0;
     const rect = container.getBoundingClientRect();
-    const rawPx = clientX - rect.left + container.scrollLeft - INFO_PANEL_WIDTH;
+    const rawPx = clientX - rect.left + container.scrollLeft - infoPanelWidth;
     return Math.max(0, Math.min(rawPx, blockWidth * 24));
-  }, [containerRef, blockWidth]);
+  }, [containerRef, blockWidth, infoPanelWidth]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
@@ -61,11 +60,18 @@ export function Needle({
     if (isLive) onExitLive();
   }, [isLive, onExitLive]);
 
+  const snapToHalfHour = useCallback((px: number): number => {
+    // Each half-hour = blockWidth / 2 pixels
+    const halfBlock = blockWidth / 2;
+    const snapped = Math.round(px / halfBlock) * halfBlock;
+    return Math.max(0, Math.min(snapped, blockWidth * 24));
+  }, [blockWidth]);
+
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging.current) return;
-    const px = pixelFromClientX(e.clientX);
+    const px = snapToHalfHour(pixelFromClientX(e.clientX));
     onNeedleChange(pixelToUtcMs(px, selectedDate, blockWidth, myTimezone));
-  }, [pixelFromClientX, onNeedleChange, selectedDate, blockWidth, myTimezone]);
+  }, [pixelFromClientX, snapToHalfHour, onNeedleChange, selectedDate, blockWidth, myTimezone]);
 
   const handlePointerUp = useCallback(() => {
     isDragging.current = false;
@@ -89,14 +95,14 @@ export function Needle({
     const container = containerRef.current;
     if (!container) return;
     const px = getPixelX();
-    const visibleWidth = container.clientWidth - INFO_PANEL_WIDTH;
+    const visibleWidth = container.clientWidth - infoPanelWidth;
     const scrollLeft = container.scrollLeft;
     if (px < scrollLeft || px > scrollLeft + visibleWidth - 100) {
       container.scrollTo({ left: Math.max(0, px - visibleWidth / 2), behavior: 'smooth' });
     }
-  }, [needleUtcMs, isLive, containerRef, getPixelX]);
+  }, [needleUtcMs, isLive, containerRef, getPixelX, infoPanelWidth]);
 
-  const left = INFO_PANEL_WIDTH + getPixelX();
+  const left = infoPanelWidth + getPixelX();
 
   // ── All-zones tooltip rendered via portal (bypasses scroll container clipping) ──
   const tooltip = tooltipPos && showTooltip && createPortal(

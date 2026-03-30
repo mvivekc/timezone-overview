@@ -1,8 +1,8 @@
 import type { Zone, WorkHours } from '../types';
 
 export const HOUR_WIDTH_PX = 56;
+export const HOUR_WIDTH_MOBILE_PX = 40;
 export const TOTAL_WIDTH_PX = HOUR_WIDTH_PX * 24; // 1344px
-export const INFO_PANEL_WIDTH_PX = 200;
 export const STORAGE_KEY = 'tz-helper-v1';
 export const ZONE_WARNING_THRESHOLD = 6;
 

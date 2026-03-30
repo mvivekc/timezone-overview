@@ -2,13 +2,11 @@ import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import type { Zone, WorkHours } from '@/types';
 import { buildHourBlocks } from '@/utils/timezones';
 import { computeOverlapColumns, computeTeamOverlapColumns, computeTeamOverlapMinutes } from '@/utils/overlaps';
-import { HOUR_WIDTH_PX } from '@/utils/constants';
+import { HOUR_WIDTH_PX, HOUR_WIDTH_MOBILE_PX } from '@/utils/constants';
 import { HourRuler } from './HourRuler';
 import { TimelineRow } from './TimelineRow';
 import { Needle } from './Needle';
 import { TeamOverlapRow } from './TeamOverlapRow';
-
-const INFO_PANEL_WIDTH = 224; // matches w-56
 
 interface Props {
   zones: Zone[];
@@ -36,14 +34,18 @@ export function TimelineGrid({
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [blockWidth, setBlockWidth] = useState(HOUR_WIDTH_PX);
+  const [infoPanelWidth, setInfoPanelWidth] = useState(288);
 
   // ── Dynamic block width via ResizeObserver ────────────────────────────────
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const update = () => {
-      const available = el.clientWidth - INFO_PANEL_WIDTH;
-      setBlockWidth(Math.max(HOUR_WIDTH_PX, Math.floor(available / 24)));
+      const isMobile = el.clientWidth < 640;
+      const panelW = isMobile ? 176 : 288;
+      const minBlock = isMobile ? HOUR_WIDTH_MOBILE_PX : HOUR_WIDTH_PX;
+      setInfoPanelWidth(panelW);
+      setBlockWidth(Math.max(minBlock, Math.floor((el.clientWidth - panelW) / 24)));
     };
     update();
     const obs = new ResizeObserver(update);
@@ -117,9 +119,9 @@ export function TimelineGrid({
   return (
     <div className="relative bg-white rounded-xl shadow-sm border border-slate-200">
       <div className="timeline-scroll" ref={scrollRef}>
-        <HourRuler blockWidth={blockWidth} hour12={hour12} myTimezone={myTimezone} />
+        <HourRuler blockWidth={blockWidth} hour12={hour12} myTimezone={myTimezone} infoPanelWidth={infoPanelWidth} />
 
-        <div className="relative">
+        <div>
           {zoneBlocks.map(({ zone, blocks }, i) => (
             <TimelineRow
               key={zone.id}
@@ -149,24 +151,27 @@ export function TimelineGrid({
               blockWidth={blockWidth}
               overlapColumns={teamOverlapColumns}
               durationMinutes={teamOverlapMinutes}
-            />
-          )}
-
-          {zones.length > 0 && (
-            <Needle
-              needleUtcMs={needleUtcMs}
-              selectedDate={selectedDate}
-              isLive={isLive}
-              blockWidth={blockWidth}
-              myTimezone={myTimezone}
-              hour12={hour12}
-              zones={zones}
-              containerRef={scrollRef}
-              onNeedleChange={onNeedleChange}
-              onExitLive={onExitLive}
+              infoPanelWidth={infoPanelWidth}
             />
           )}
         </div>
+
+        {/* Needle spans full scroll container height so the knob can sit on the ruler row */}
+        {zones.length > 0 && (
+          <Needle
+            needleUtcMs={needleUtcMs}
+            selectedDate={selectedDate}
+            isLive={isLive}
+            blockWidth={blockWidth}
+            infoPanelWidth={infoPanelWidth}
+            myTimezone={myTimezone}
+            hour12={hour12}
+            zones={zones}
+            containerRef={scrollRef}
+            onNeedleChange={onNeedleChange}
+            onExitLive={onExitLive}
+          />
+        )}
       </div>
     </div>
   );

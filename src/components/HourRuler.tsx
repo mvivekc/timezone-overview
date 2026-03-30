@@ -4,15 +4,16 @@ interface Props {
   blockWidth: number;
   hour12: boolean;
   myTimezone: string;
+  infoPanelWidth: number;
 }
 
-export function HourRuler({ blockWidth, hour12, myTimezone }: Props) {
+export function HourRuler({ blockWidth, hour12, myTimezone, infoPanelWidth }: Props) {
   const tzLabel = myTimezone.replace(/_/g, ' ');
 
   return (
-    <div className="flex sticky top-0 z-10 bg-slate-50 border-b border-slate-200">
-      {/* Spacer aligned with the info panel (w-56 = 224px) */}
-      <div className="w-56 shrink-0 flex items-center px-3">
+    <div className="flex sticky top-0 bg-slate-50 border-b border-slate-200" style={{ zIndex: 31 }}>
+      {/* Spacer aligned with the info panel */}
+      <div style={{ width: infoPanelWidth, zIndex: 40 }} className="shrink-0 flex items-center px-3 sticky left-0 bg-slate-50">
         <span className="text-[11px] text-slate-500 font-medium truncate">
           00-23 in {tzLabel}
         </span>
