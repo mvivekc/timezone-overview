@@ -73,7 +73,7 @@ export function Header({
   }
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
       {/* Primary row — visible on all screen sizes */}
       <div className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-2.5 sm:py-3">
 
@@ -137,6 +137,8 @@ export function Header({
           </div>
 
           {/* 12/24h toggle */}
+          <div className="flex flex-col gap-0.5 shrink-0">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Time format</span>
           <div className="flex items-center rounded-lg border border-slate-200 overflow-hidden text-sm">
             <button
               onClick={() => onSetHour12(false)}
@@ -152,6 +154,7 @@ export function Header({
             >
               12h
             </button>
+          </div>
           </div>
 
           {!isLive && (
