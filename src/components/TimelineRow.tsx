@@ -28,26 +28,27 @@ interface Props {
 
 // ─── Boundary handle ──────────────────────────────────────────────────────────
 
-/** Find column position for a boundary minute in local time. */
-function boundaryToCol(localMinutes: number, blocks: HourBlock[]): number {
+/** Find column position for a boundary minute in local time.
+ *  Uses UTC midpoints of each half-block to match the correct local wall-clock time,
+ *  so handle positions stay correct regardless of myTimezone's UTC offset. */
+function boundaryToCol(localMinutes: number, blocks: HourBlock[], ianaZone: string): number {
   if (blocks.length === 0) return 0;
   const target = ((localMinutes % 1440) + 1440) % 1440;
-  const first = blocks[0].localMinutes;
 
-  // Walk half-hour marks across the row's local-time timeline and find exact match.
-  for (let halfStep = 0; halfStep <= 48; halfStep++) {
-    const minuteAtStep = (first + halfStep * 30) % (24 * 60);
-    if (minuteAtStep === target) return halfStep / 2;
-  }
-
-  // DST gap fallback: use nearest half-step by circular minute distance.
+  // Walk 48 half-steps (each = 30 min of UTC), classifying by the local time at the
+  // midpoint of each half-block in the row's timezone.
   let bestStep = 0;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (let halfStep = 0; halfStep <= 48; halfStep++) {
-    const minuteAtStep = (first + halfStep * 30) % (24 * 60);
-    const direct = Math.abs(minuteAtStep - target);
+    // UTC at the start of this half-step
+    const blockIdx = Math.floor(halfStep / 2);
+    const halfOffset = (halfStep % 2) * 30 * 60_000; // 0 or 30 min in ms
+    const utcAtStep = blocks[Math.min(blockIdx, blocks.length - 1)].utcMs + halfOffset;
+    const localMins = utcMsToLocalMinutes(utcAtStep, ianaZone);
+    const direct = Math.abs(localMins - target);
     const wrapped = 24 * 60 - direct;
     const distance = Math.min(direct, wrapped);
+    if (distance === 0) return halfStep / 2;
     if (distance < bestDistance) {
       bestDistance = distance;
       bestStep = halfStep;
@@ -125,6 +126,15 @@ function overlapRuns(slots: boolean[] | null | undefined): Array<{ start: number
     }
   }
   return runs;
+}
+
+function utcMsToLocalMinutes(utcMs: number, ianaZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: ianaZone,
+  }).formatToParts(new Date(utcMs));
+  const h = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10) % 24;
+  const m = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10);
+  return h * 60 + m;
 }
 
 // ─── TimelineRow ──────────────────────────────────────────────────────────────
@@ -212,8 +222,11 @@ export function TimelineRow({
         const px = Math.max(0, Math.min(ev.clientX - rect.left, bw * 24 - 1));
         const colFloat = px / bw;
         const halfStep = Math.max(0, Math.min(48, Math.round(colFloat * 2)));
-        const first = blocks[0]?.localMinutes ?? 0;
-        const candidateMinutes = (first + halfStep * 30) % (24 * 60);
+        // Derive local minutes from the UTC time at this half-step position
+        const blockIdx = Math.min(Math.floor(halfStep / 2), blocks.length - 1);
+        const halfOffset = (halfStep % 2) * 30 * 60_000;
+        const utcAtStep = (blocks[blockIdx]?.utcMs ?? 0) + halfOffset;
+        const candidateMinutes = utcMsToLocalMinutes(utcAtStep, zone.tz);
 
         const cur = whRef.current;
         const next = { ...cur };
@@ -252,10 +265,10 @@ export function TimelineRow({
   );
 
   // Pre-compute handle column positions
-  const fringeStartCol = boundaryToCol(wh.fringeStart, hourBlocks);
-  const coreStartCol = boundaryToCol(wh.coreStart, hourBlocks);
-  const coreEndCol = boundaryToCol(wh.coreEnd, hourBlocks);
-  const fringeEndCol = boundaryToCol(wh.fringeEnd, hourBlocks);
+  const fringeStartCol = boundaryToCol(wh.fringeStart, hourBlocks, zone.tz);
+  const coreStartCol = boundaryToCol(wh.coreStart, hourBlocks, zone.tz);
+  const coreEndCol = boundaryToCol(wh.coreEnd, hourBlocks, zone.tz);
+  const fringeEndCol = boundaryToCol(wh.fringeEnd, hourBlocks, zone.tz);
 
   const hasCustomWorkHours = zone.workHours !== undefined;
   const overlapSlotRuns = overlapRuns(overlapColumns);
@@ -284,7 +297,7 @@ export function TimelineRow({
         ].join(' ')}
       >
         {/* Info panel */}
-        <div className={`flex items-center gap-2 px-3 py-4 ${infoPanelBgClass} border-r border-slate-100 shrink-0 w-56 ${isReference ? 'border-l-4 border-l-indigo-400' : ''}`}>
+        <div className={`flex items-center gap-2 px-3 py-4 ${infoPanelBgClass} border-r border-slate-100 shrink-0 w-72 ${isReference ? 'border-l-4 border-l-indigo-400' : ''}`}>
         {/* Row-reorder drag grip */}
         <div
           className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 shrink-0 touch-none"
@@ -308,26 +321,24 @@ export function TimelineRow({
             {zone.person && (
               <div className="text-xs text-slate-500 truncate mt-0.5">{zone.person}</div>
             )}
-            <div className="flex items-baseline gap-1.5 mt-1">
+            <div className="flex items-center gap-1.5 mt-1">
               <span className={`text-base font-bold ${timeDisplayTextClass} tabular-nums`}>{currentTime}</span>
               <span className="text-xs text-slate-500 font-medium">{utcOffset}</span>
             </div>
           </div>
         </button>
 
-        <div className="flex items-center gap-0.5 shrink-0">
-          {/* Per-zone reset — only visible when zone has custom work hours */}
+        <div className="flex items-center gap-1 shrink-0 ml-auto">
           {hasCustomWorkHours && (
             <button
               onClick={() => onResetWorkHours(zone.id)}
               aria-label={`Reset work hours for ${zone.label}`}
               title="Reset to default work hours"
-              className="p-1.5 rounded-md hover:bg-amber-50 hover:text-amber-600 text-slate-300 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              className="p-1.5 rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors duration-200"
             >
-              <RotateCcw className="w-3 h-3" />
+              <RotateCcw className="w-3.5 h-3.5 stroke-2" />
             </button>
           )}
-
           <button
             onClick={() => onRemove(zone.id)}
             aria-label={`Remove ${zone.label}`}
@@ -344,8 +355,8 @@ export function TimelineRow({
           // Paint each hour block in two 30-minute halves so boundaries
           // at :30 start exactly at the handle location.
           (() => {
-            const leftClass = classifyMinute((block.localMinutes + 15) % (24 * 60), wh);
-            const rightClass = classifyMinute((block.localMinutes + 45) % (24 * 60), wh);
+            const leftClass = classifyMinute(utcMsToLocalMinutes(block.utcMs + 15 * 60_000, zone.tz), wh);
+            const rightClass = classifyMinute(utcMsToLocalMinutes(block.utcMs + 45 * 60_000, zone.tz), wh);
             return (
           <div
             key={`${block.utcMs}-${colIndex}`}

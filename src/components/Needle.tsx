@@ -74,12 +74,14 @@ export function Needle({
 
   // Smooth live transition — enabled 300 ms after entering live mode so the
   // initial snap-to-current-time is instant, then subsequent ticks glide.
+  // Also resets on myTimezone change so switching timezone snaps immediately.
   const [liveTransition, setLiveTransition] = useState(false);
   useEffect(() => {
     if (!isLive) { setLiveTransition(false); return; }
+    setLiveTransition(false);
     const t = setTimeout(() => setLiveTransition(true), 300);
     return () => { clearTimeout(t); setLiveTransition(false); };
-  }, [isLive]);
+  }, [isLive, myTimezone]);
 
   // Scroll needle into view when live
   useEffect(() => {

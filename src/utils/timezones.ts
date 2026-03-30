@@ -236,7 +236,7 @@ export function utcMsToPixel(utcMs: number, dateString: string, blockWidth: numb
   const midnightUtc = getLocalMidnightAsUTC(dateString, tz);
   const msPerPx = (24 * 60 * 60 * 1000) / totalWidth;
   const px = (utcMs - midnightUtc) / msPerPx;
-  return Math.max(0, Math.min(px, totalWidth - blockWidth));
+  return Math.max(0, Math.min(px, totalWidth));
 }
 
 /** Convert a "HH:MM" string (in myTimezone) to a UTC ms value on selectedDate */
