@@ -157,12 +157,6 @@ export function Header({
           </div>
           </div>
 
-          {!isLive && (
-            <Button variant="outline" size="sm" onClick={onGoLive} className="gap-1.5">
-              <RefreshCw className="w-3.5 h-3.5" />
-              Back to live
-            </Button>
-          )}
         </div>
 
         {/* Spacer pushes live clock to the right */}
