@@ -1,7 +1,7 @@
 project: timezone-helper
 
 type: web
-port: 3000
+port: 8080
 
 build:
   command: npm run build
