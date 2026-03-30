@@ -1,6 +1,8 @@
 project: timezone-helper
 
-type: static
+type: web
+port: 3000
+
 build:
   command: npm run build
 output: dist
