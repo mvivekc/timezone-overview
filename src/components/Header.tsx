@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Clock, PlusCircle, RefreshCw } from 'lucide-react';
+import { PlusCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectGroup, SelectItem,
@@ -77,21 +77,10 @@ export function Header({
       {/* Primary row — visible on all screen sizes */}
       <div className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-2.5 sm:py-3">
 
-        {/* Current time in my timezone */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-          <div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <span className="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums leading-none">{localTime}</span>
-              {isLive && (
-                <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">
-                  <span className="live-dot" />
-                  Live
-                </span>
-              )}
-            </div>
-            <div className="text-xs text-slate-400 mt-0.5 hidden sm:block">{myTimezone.replace(/_/g, ' ')}</div>
-          </div>
+        {/* Brand — ZoneSync logo */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xl leading-none select-none" aria-hidden="true">🌐</span>
+          <span className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-none">ZoneSync</span>
         </div>
 
         <div className="h-10 w-px bg-slate-200 shrink-0 hidden sm:block" />
@@ -173,8 +162,29 @@ export function Header({
           )}
         </div>
 
-        {/* Add timezone button — always visible */}
-        <Button size="sm" onClick={onAddZone} className="gap-1 sm:gap-1.5 ml-auto shrink-0">
+        {/* Spacer pushes live clock to the right */}
+        <div className="flex-1" />
+
+        {/* Live clock — right-aligned */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="text-right hidden sm:block">
+            <div className="text-xs text-slate-400 leading-tight">{myTimezone.replace(/_/g, ' ')}</div>
+            <div className="text-base font-bold text-slate-900 tabular-nums leading-tight">{localTime}</div>
+          </div>
+          <div className="sm:hidden text-base font-bold text-slate-900 tabular-nums">{localTime}</div>
+          <span
+            className={`live-dot-lg shrink-0 ${isLive ? '' : 'live-dot-lg--idle'}`}
+            title={isLive ? 'Live — showing current time' : 'Click to return to live'}
+            aria-label={isLive ? 'Live' : 'Not live'}
+            onClick={!isLive ? onGoLive : undefined}
+            style={!isLive ? { cursor: 'pointer' } : undefined}
+          />
+        </div>
+
+        <div className="h-10 w-px bg-slate-200 shrink-0 hidden sm:block" />
+
+        {/* Add timezone button */}
+        <Button size="sm" onClick={onAddZone} className="gap-1 sm:gap-1.5 shrink-0">
           <PlusCircle className="w-3.5 h-3.5" />
           <span className="sm:hidden">Add</span>
           <span className="hidden sm:inline">Add timezone</span>

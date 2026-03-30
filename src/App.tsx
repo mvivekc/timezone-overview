@@ -151,7 +151,7 @@ export function App() {
 
   return (
     <>
-      <title>Timezone Helper</title>
+      <title>ZoneSync</title>
 
       <div className="min-h-screen bg-slate-100 flex flex-col">
         <Header
