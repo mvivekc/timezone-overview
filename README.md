@@ -218,14 +218,6 @@ If a `vibectl` command fails due to expired auth, run:
 vibectl login
 ```
 
-### Notes on history
-
-During Vibe bootstrap, the repository metadata was switched to the Vibe-managed remote. If you need older pre-bootstrap local history, it is preserved in `.git_backup` and can be viewed with:
-
-```bash
-git --git-dir=.git_backup --work-tree=. log --oneline
-```
-
 ---
 
 ## localStorage schema
