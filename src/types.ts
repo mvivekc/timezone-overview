@@ -5,6 +5,8 @@ export interface WorkHours {
   coreStart: number;
   coreEnd: number;
   fringeEnd: number;
+  lunchStart?: number;  // default 720 (12:00)
+  lunchEnd?: number;    // default 780 (13:00)
 }
 
 export interface Zone {
@@ -16,7 +18,7 @@ export interface Zone {
   workHours?: WorkHours; // undefined = use global default
 }
 
-export type WorkClass = 'core' | 'fringe' | 'off';
+export type WorkClass = 'core' | 'fringe' | 'lunch' | 'off';
 
 export interface HourBlock {
   hour: number;       // 0–23 local hour

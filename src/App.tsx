@@ -197,6 +197,10 @@ export function App() {
               Early / late (default 7–9, 18–20)
             </span>
             <span className="flex items-center gap-1.5 text-xs text-slate-500">
+              <span className="w-3.5 h-3.5 rounded-sm bg-[var(--color-fringe)] border border-[var(--color-fringe-border)]" />
+              Lunch (default 12–13)
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-slate-500">
               <span className="w-3.5 h-3.5 rounded-sm bg-slate-200 border border-slate-300" />
               Off hours
             </span>

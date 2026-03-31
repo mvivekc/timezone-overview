@@ -103,12 +103,15 @@ function boundaryLabel(boundary: keyof WorkHours): string {
   if (boundary === 'fringeStart') return 'Early start';
   if (boundary === 'coreStart') return 'Work start';
   if (boundary === 'coreEnd') return 'Work end';
+  if (boundary === 'lunchStart') return 'Lunch start';
+  if (boundary === 'lunchEnd') return 'Lunch end';
   return 'Late end';
 }
 
 function workClassBg(cls: WorkClass): string {
   if (cls === 'core') return 'bg-[var(--color-core)]';
   if (cls === 'fringe') return 'bg-[var(--color-fringe)]';
+  if (cls === 'lunch') return 'bg-[var(--color-fringe)]';
   return 'bg-[var(--color-off)]';
 }
 
@@ -166,17 +169,17 @@ export function TimelineRow({
 
   const infoPanelBgClass =
     needleWorkClass === 'core' ? 'bg-green-100' :
-    needleWorkClass === 'fringe' ? 'bg-amber-50' :
+    (needleWorkClass === 'fringe' || needleWorkClass === 'lunch') ? 'bg-amber-50' :
     'bg-white';
 
   const timeLabelTextClass =
     needleWorkClass === 'core' ? 'text-green-900' :
-    needleWorkClass === 'fringe' ? 'text-amber-900' :
+    (needleWorkClass === 'fringe' || needleWorkClass === 'lunch') ? 'text-amber-900' :
     'text-slate-700';
 
   const timeDisplayTextClass =
     needleWorkClass === 'core' ? 'text-green-800' :
-    needleWorkClass === 'fringe' ? 'text-amber-800' :
+    (needleWorkClass === 'fringe' || needleWorkClass === 'lunch') ? 'text-amber-800' :
     'text-slate-900';
 
   // Track whether pointer started on the row-reorder grip
@@ -202,14 +205,14 @@ export function TimelineRow({
     (e: React.PointerEvent, boundary: keyof WorkHours) => {
       e.preventDefault();
       e.stopPropagation();
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
       // Capture blockWidth and hourBlocks at drag-start time
       const bw = blockWidth;
       const blocks = hourBlocks;
+      const initialMinutes = whRef.current[boundary] ?? DEFAULT_WORK_HOURS[boundary] ?? 0;
       setDragPreview({
         boundary,
-        localMinutes: whRef.current[boundary],
+        localMinutes: initialMinutes,
         clientX: e.clientX,
         clientY: e.clientY,
       });
@@ -235,16 +238,24 @@ export function TimelineRow({
         if (boundary === 'fringeStart') {
           next.fringeStart = Math.max(0, Math.min(candidateMinutes, cur.coreStart - 30));
         } else if (boundary === 'coreStart') {
-          next.coreStart = Math.max(cur.fringeStart + 30, Math.min(candidateMinutes, cur.coreEnd - 30));
+          const ls = cur.lunchStart ?? DEFAULT_WORK_HOURS.lunchStart!;
+          next.coreStart = Math.max(cur.fringeStart + 30, Math.min(candidateMinutes, ls - 30));
         } else if (boundary === 'coreEnd') {
-          next.coreEnd = Math.max(cur.coreStart + 30, Math.min(candidateMinutes, cur.fringeEnd - 30));
+          const le = cur.lunchEnd ?? DEFAULT_WORK_HOURS.lunchEnd!;
+          next.coreEnd = Math.max(le + 30, Math.min(candidateMinutes, cur.fringeEnd - 30));
         } else if (boundary === 'fringeEnd') {
           next.fringeEnd = Math.max(cur.coreEnd + 30, Math.min(candidateMinutes, 23 * 60 + 30));
+        } else if (boundary === 'lunchStart') {
+          const le = cur.lunchEnd ?? DEFAULT_WORK_HOURS.lunchEnd!;
+          next.lunchStart = Math.max(cur.coreStart + 30, Math.min(candidateMinutes, le - 30));
+        } else if (boundary === 'lunchEnd') {
+          const ls = cur.lunchStart ?? DEFAULT_WORK_HOURS.lunchStart!;
+          next.lunchEnd = Math.max(ls + 30, Math.min(candidateMinutes, cur.coreEnd - 30));
         }
 
         setDragPreview({
           boundary,
-          localMinutes: next[boundary],
+          localMinutes: next[boundary] ?? DEFAULT_WORK_HOURS[boundary] ?? 0,
           clientX: ev.clientX,
           clientY: ev.clientY,
         });
@@ -270,6 +281,8 @@ export function TimelineRow({
   const coreStartCol = boundaryToCol(wh.coreStart, hourBlocks, zone.tz);
   const coreEndCol = boundaryToCol(wh.coreEnd, hourBlocks, zone.tz);
   const fringeEndCol = boundaryToCol(wh.fringeEnd, hourBlocks, zone.tz);
+  const lunchStartCol = boundaryToCol(wh.lunchStart ?? DEFAULT_WORK_HOURS.lunchStart!, hourBlocks, zone.tz);
+  const lunchEndCol = boundaryToCol(wh.lunchEnd ?? DEFAULT_WORK_HOURS.lunchEnd!, hourBlocks, zone.tz);
 
   const hasCustomWorkHours = zone.workHours !== undefined;
   const overlapSlotRuns = overlapRuns(overlapColumns);
@@ -396,6 +409,20 @@ export function TimelineRow({
           blockWidth={blockWidth}
           color="green"
           onPointerDown={(e) => startBoundaryDrag(e, 'coreStart')}
+        />
+        {/* Lunch-start handle (amber) */}
+        <BoundaryHandle
+          col={lunchStartCol}
+          blockWidth={blockWidth}
+          color="amber"
+          onPointerDown={(e) => startBoundaryDrag(e, 'lunchStart')}
+        />
+        {/* Lunch-end handle (amber) */}
+        <BoundaryHandle
+          col={lunchEndCol}
+          blockWidth={blockWidth}
+          color="amber"
+          onPointerDown={(e) => startBoundaryDrag(e, 'lunchEnd')}
         />
         {/* Core-end handle (green) */}
         <BoundaryHandle

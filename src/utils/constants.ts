@@ -10,12 +10,15 @@ const hm = (hours: number, minutes = 0) => hours * 60 + minutes;
 
 export const WORK_CORE = { start: hm(9), end: hm(18) };   // green
 export const WORK_FRINGE = { start: hm(7), end: hm(20) }; // amber
+export const WORK_LUNCH = { start: hm(12), end: hm(13) }; // yellow (720, 780)
 
 export const DEFAULT_WORK_HOURS: WorkHours = {
   fringeStart: WORK_FRINGE.start,
   coreStart: WORK_CORE.start,
   coreEnd: WORK_CORE.end,
   fringeEnd: WORK_FRINGE.end,
+  lunchStart: WORK_LUNCH.start,
+  lunchEnd: WORK_LUNCH.end,
 };
 
 export const DEFAULT_ZONES: Zone[] = [

@@ -44,6 +44,9 @@ export function getUtcOffsetLabel(ianaZone: string, utcMs: number): string {
 
 export function classifyMinute(localMinutes: number, wh: WorkHours = DEFAULT_WORK_HOURS): WorkClass {
   const minute = ((localMinutes % 1440) + 1440) % 1440;
+  const lunchStart = wh.lunchStart ?? DEFAULT_WORK_HOURS.lunchStart!;
+  const lunchEnd   = wh.lunchEnd   ?? DEFAULT_WORK_HOURS.lunchEnd!;
+  if (minute >= lunchStart && minute < lunchEnd) return 'lunch';
   if (minute >= wh.coreStart && minute < wh.coreEnd) return 'core';
   if (minute >= wh.fringeStart && minute < wh.fringeEnd) return 'fringe';
   return 'off';

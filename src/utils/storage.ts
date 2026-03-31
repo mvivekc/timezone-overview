@@ -1,5 +1,5 @@
 import type { StorageSchema, Zone } from '../types';
-import { DEFAULT_ZONES, STORAGE_KEY } from './constants';
+import { DEFAULT_ZONES, STORAGE_KEY, DEFAULT_WORK_HOURS } from './constants';
 
 function today(): string {
   const d = new Date();
@@ -66,6 +66,12 @@ function migrateZones(zones: Zone[] | undefined): Zone[] {
         coreStart: normalizeMinutesValue(wh.coreStart),
         coreEnd: normalizeMinutesValue(wh.coreEnd),
         fringeEnd: normalizeMinutesValue(wh.fringeEnd),
+        lunchStart: typeof wh.lunchStart === 'number'
+          ? normalizeMinutesValue(wh.lunchStart)
+          : DEFAULT_WORK_HOURS.lunchStart,
+        lunchEnd: typeof wh.lunchEnd === 'number'
+          ? normalizeMinutesValue(wh.lunchEnd)
+          : DEFAULT_WORK_HOURS.lunchEnd,
       },
     };
   });
