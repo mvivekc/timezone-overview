@@ -174,6 +174,7 @@ function zoneWorkClass(zone: Zone, utcMs: number): WorkClass {
 const WORK_DOT: Record<WorkClass, string> = {
   core:   '#4ade80', // green-400
   fringe: '#fbbf24', // amber-400
+  lunch:  '#f97316', // orange-500
   off:    '#475569', // slate-600
 };
 
